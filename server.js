@@ -30,7 +30,7 @@ app.use(bodyParser.urlencoded({
 app.use(express.static("public"));
 
 // Database configuration with mongoose
-mongoose.connect("mongodb://heroku_5l4zf6t0:c4s25tbp3p4j3ljnvbcul8u3go@ds157040.mlab.com:57040/heroku_5l4zf6t0");
+mongoose.connect("mongodb://heroku_7vsg8t4d:1b2k9t3jqg5egmal65g0rb8nrq@ds241895.mlab.com:41895/heroku_7vsg8t4d");
 var db = mongoose.connection;
 
 // Show any mongoose errors
@@ -62,6 +62,7 @@ app.get("/scrape", function(req, res) {
       // Add the text and href of every link, and save them as properties of the result object
       result.title = $(this).children("a").text();
       result.link = $(this).children("a").attr("href");
+      result.paragraph = $(this).children("p").text();
 
       // Using our Article model, create a new entry
       // This effectively passes the result object to the entry (and the title and link)
