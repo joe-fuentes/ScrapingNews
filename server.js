@@ -1,177 +1,157 @@
-// Dependencies
-var path = require('path');
-var bodyParser = require('body-parser');
+/* Showing Mongoose's "Populated" Method (18.3.8)
+ * INSTRUCTOR ONLY
+ * =============================================== */
 
-// Initialize Express app
-var express = require('express');
+// Dependencies
+var express = require("express");
+var bodyParser = require("body-parser");
+var logger = require("morgan");
+var mongoose = require("mongoose");
+// Requiring our Note and Article models
+var Note = require("./models/Note.js");
+var Article = require("./models/Article.js");
+// Our scraping tools
+var request = require("request");
+var cheerio = require("cheerio");
+// Set mongoose to leverage built in JavaScript ES6 Promises
+mongoose.Promise = Promise;
+
+
+// Initialize Express
 var app = express();
 
-// Require handlebars
-var exphbs = require('express-handlebars');
-// Create `ExpressHandlebars` instance with a default layout.
-var hbs = exphbs.create({
-  defaultLayout: 'main',
-  // Specify helpers which are only registered on this instance.
-  helpers: {
-    addOne: function(value, options){
-      return parseInt(value) + 1;
-    }
-  }
-});
-// Set up view engine
-app.engine('handlebars', hbs.engine);
-app.set('view engine', 'handlebars');
-
-// Require request and cheerio. This makes the scraping possible
-var request = require('request');
-var cheerio = require('cheerio');
-
-// Require mongoose and mongodb objectid
-var mongoose = require('mongoose');
-var ObjectId = require('mongojs').ObjectID;
-
-// Database configuration
-mongoose.connect('mongodb://heroku_7vsg8t4d:1b2k9t3jqg5egmal65g0rb8nrq@ds241895.mlab.com:41895/heroku_7vsg8t4d');
-var db = mongoose.connection;
-
-// Show any mongoose errors
-db.on('error', function(err) {
-  console.log('Database Error:', err);
-});
-
-// Require our scrapedData and comment models
-var ScrapedData = require('./scrapedDataModel');
-
-// Scrape data when app starts
-var options = {
-  url: 'https://www.bodybuilding.com/fun/whats-new.html',
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13'
-  }
-};
-// Make a request for the news section of bodybuilding.com
-request(options, function(error, response, html) {
-  // Load the html body from request into cheerio
-  var $ = cheerio.load(html);
-  // For each element with a "new-content-block" class
-  $('div.new-content-block').each(function(i, element) {
-    // Save the div and a tag
-    var $a = $(this).children('a');
-    var $div = $(this).children('div');
-    // Save the article url
-    var articleURL = $a.attr('href');
-    // Save the img url of each element
-    var imgURL = $a.children('img').attr('src');
-    // Save the title text
-    var title = $div.children('h4').text();
-    // Save the synopsis text
-    var synopsis = $div.children('p').text();
-    // Create mongoose model
-    var scrapedData = new ScrapedData({
-      title: title,
-      imgURL: imgURL,
-      synopsis: synopsis,
-      articleURL: articleURL
-    });
-    // Save data
-    scrapedData.save(function(err) {
-      if (err) {
-        //console.log(err);
-      }
-      //console.log('Saved');
-    });
-  });
-});
-
-// Express middleware
+// Use morgan and body parser with our app
+app.use(logger("dev"));
 app.use(bodyParser.urlencoded({
   extended: false
 }));
-app.use(express.static('public'));
 
-// Main route send main page
-app.get('/', function(req, res) {
-  ScrapedData
-    .findOne()
-    .exec(function(err,data) {
-      if (err) return console.error(err);
-      // If successful render first data
-      res.render('index', {
-        imgURL: data.imgURL,
-        title: data.title,
-        synopsis: data.synopsis,
-        _id: data._id,
-        articleURL: data.articleURL,
-        comments: data.comments
+// Make public a static dir
+app.use(express.static("public"));
+
+// Database configuration with mongoose
+mongoose.connect("mongodb://heroku_7vsg8t4d:1b2k9t3jqg5egmal65g0rb8nrq@ds241895.mlab.com:41895/heroku_7vsg8t4d");
+var db = mongoose.connection;
+
+// Show any mongoose errors
+db.on("error", function(error) {
+  console.log("Mongoose Error: ", error);
+});
+
+// Once logged in to the db through mongoose, log a success message
+db.once("open", function() {
+  console.log("Mongoose connection successful.");
+});
+
+
+// Routes
+// ======
+
+// A GET request to scrape the echojs website
+app.get("/scrape", function(req, res) {
+  // First, we grab the body of the html with request
+  request("http://www.espn.com/college-football/team/_/id/61/georgia-bulldogs", function(error, response, html) {
+    // Then, we load that into cheerio and save it to $ for a shorthand selector
+    var $ = cheerio.load(html);
+    // Now, we grab every h5 within an article tag, and do the following:
+    $("article h1").each(function(i, element) {
+
+      // Save an empty result object
+      var result = {};
+
+      // Add the text and href of every link, and save them as properties of the result object
+      result.title = $(this).children("a").text();
+      result.link = $(this).children("a").attr("href");
+
+      // Using our Article model, create a new entry
+      // This effectively passes the result object to the entry (and the title and link)
+      var entry = new Article(result);
+      console.log(entry);
+      // Now, save that entry to the db
+      entry.save(function(err, doc) {
+        // Log any errors
+        if (err) {
+          console.log(err);
+        }
+        // Or log the doc
+        else {
+          console.log(doc);
+        }
       });
-    })
+
+    });
+  });
+  // Tell the browser that we finished scraping the text
+  res.send("Scrape Complete");
 });
 
-// Retrieve next data from the db
-app.get('/next/:id', function(req, res) {
-  ScrapedData
-    .find({
-      _id: {$gt: req.params.id}
-    })
-    .sort({_id: 1 })
-    .limit(1)
-    .exec(function(err,data) {
-      if (err) return console.error(err);
-      res.json(data);
-    })
-});
-
-// Retrieve prev data from the db
-app.get('/prev/:id', function(req, res) {
-  ScrapedData
-    .find({
-      _id: {$lt: req.params.id}
-    })
-    .sort({_id: -1 })
-    .limit(1)
-    .exec(function(err,data) {
-      if (err) return console.error(err);
-      res.json(data);
-    })
-});
-
-// Add comment data to the db
-app.post('/comment/:id', function(req, res) {
-  // Update scraped data with comment
-  ScrapedData.findByIdAndUpdate(
-    req.params.id,
-    {$push: {
-      comments: {
-        text: req.body.comment
-      }
-    }},
-    {upsert: true, new: true},
-    function(err, data) {
-      if (err) return console.error(err);
-      res.json(data.comments);
+// This will get the articles we scraped from the mongoDB
+app.get("/articles", function(req, res) {
+  // Grab every doc in the Articles array
+  Article.find({}, function(error, doc) {
+    // Log any errors
+    if (error) {
+      console.log(error);
     }
-  );
+    // Or send the doc to the browser as a json object
+    else {
+      res.json(doc);
+    }
+  });
 });
 
-// Remove comment data from the db
-app.post('/remove/:id', function(req, res) {
-  // Update scraped data and remove comment
-  ScrapedData.findByIdAndUpdate(
-    req.params.id,
-    {$pull: {
-      comments: {
-        _id: req.body.id
-      }
-    }},
-    {new: true},
-    function(err, data) {
-      if (err) return console.error(err);
-      res.json(data.comments);
+// Grab an article by it's ObjectId
+app.get("/articles/:id", function(req, res) {
+  // Using the id passed in the id parameter, prepare a query that finds the matching one in our db...
+  Article.findOne({ "_id": req.params.id })
+  // ..and populate all of the notes associated with it
+  .populate("note")
+  // now, execute our query
+  .exec(function(error, doc) {
+    // Log any errors
+    if (error) {
+      console.log(error);
     }
-  );
+    // Otherwise, send the doc to the browser as a json object
+    else {
+      res.json(doc);
+    }
+  });
 });
+
+
+// Create a new note or replace an existing note
+app.post("/articles/:id", function(req, res) {
+  // Create a new note and pass the req.body to the entry
+  var newNote = new Note(req.body);
+
+  // And save the new note the db
+  newNote.save(function(error, doc) {
+    // Log any errors
+    if (error) {
+      console.log(error);
+    }
+    // Otherwise
+    else {
+      // Use the article id to find and update it's note
+      Article.findOneAndUpdate({ "_id": req.params.id }, { "note": doc._id })
+      // Execute the above query
+      .exec(function(err, doc) {
+        // Log any errors
+        if (err) {
+          console.log(err);
+        }
+        else {
+          // Or send the document to the browser
+          res.send(doc);
+        }
+      });
+    }
+  });
+});
+
 
 // Listen on port 3000
-app.listen(3000, function() {
-  console.log('App running on port 3000!');
+app.listen(process.env.PORT || 3000, function() {
+  console.log("App running on port 3000!");
 });
