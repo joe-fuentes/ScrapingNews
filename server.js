@@ -31,7 +31,7 @@ var mongoose = require('mongoose');
 var ObjectId = require('mongojs').ObjectID;
 
 // Database configuration
-mongoose.connect('mongodb://heroku_7vsg8t4d:1b2k9t3jqg5egmal65g0rb8nrq@ds241895.mlab.com:41895/heroku_7vsg8t4d');
+mongoose.connect('mongodb://localhost/scraper');
 var db = mongoose.connection;
 
 // Show any mongoose errors
