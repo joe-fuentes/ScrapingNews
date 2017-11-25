@@ -30,17 +30,8 @@ var cheerio = require('cheerio');
 var mongoose = require('mongoose');
 var ObjectId = require('mongojs').ObjectID;
 
-// Using `mongoose.connect`...
-var promise = mongoose.connect('mongodb://localhost/myapp', {
-  useMongoClient: true,
-  /* other options */
-});
-promise.then(function(db) {
-  /* Use `db`, for instance `db.model()`*/
-});
-/*
-// Database configuration
-mongoose.connect('mongodb://localhost/scraper');*/
+// Database configuration with mongoose
+mongoose.connect("mongodb://heroku_5l4zf6t0:c4s25tbp3p4j3ljnvbcul8u3go@ds157040.mlab.com:57040/heroku_5l4zf6t0");
 var db = mongoose.connection;
 
 // Show any mongoose errors
