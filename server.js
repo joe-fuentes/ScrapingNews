@@ -37,12 +37,11 @@ var promise = mongoose.connect('mongodb://localhost/myapp', {
 });
 promise.then(function(db) {
   /* Use `db`, for instance `db.model()`*/
-  db = mongoose.connection;
 });
 /*
 // Database configuration
-mongoose.connect('mongodb://localhost/scraper');
-var db = mongoose.connection;*/
+mongoose.connect('mongodb://localhost/scraper');*/
+var db = mongoose.connection;
 
 // Show any mongoose errors
 db.on('error', function(err) {
